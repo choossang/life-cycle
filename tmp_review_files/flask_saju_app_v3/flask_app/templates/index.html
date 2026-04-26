@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>나의 사주 운세 시스템</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;color:#fff;font-family:"Malgun Gothic",sans-serif;min-height:100vh}
+
+/* ─── 헤더 ─── */
+.header{background:#111820;border-bottom:1px solid #1e2840;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:16px;color:#7ec8e3}
+.header .sub{font-size:11px;color:#445;margin-top:3px}
+.logout{font-size:12px;color:#445;text-decoration:none;padding:6px 12px;border:1px solid #1e2840;border-radius:6px}
+.logout:hover{color:#7ec8e3;border-color:#7ec8e3}
+
+/* ─── 레이아웃 ─── */
+.layout{display:grid;grid-template-columns:1fr 420px;height:calc(100vh - 57px)}
+
+/* ─── 왼쪽: 테이블 ─── */
+.table-panel{overflow-y:auto;padding:16px}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.toolbar input{background:#111820;border:1px solid #2a3040;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;width:160px;outline:none}
+.toolbar input:focus{border-color:#7ec8e3}
+.tab-btns{display:flex;gap:0}
+.tab-btn{padding:7px 14px;font-size:12px;border:1px solid #2a3040;background:#111820;color:#666;cursor:pointer;transition:.2s}
+.tab-btn:first-child{border-radius:6px 0 0 6px}
+.tab-btn:last-child{border-radius:0 6px 6px 0}
+.tab-btn.active{background:#7ec8e3;color:#0a0e1a;border-color:#7ec8e3;font-weight:bold}
+
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:10px}
+.leg{display:flex;align-items:center;gap:4px}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#111820;padding:8px 10px;text-align:left;color:#7ec8e3;font-size:11px;position:sticky;top:0;z-index:1;border-bottom:1px solid #1e2840;white-space:nowrap}
+tbody tr{cursor:pointer;transition:.15s}
+tbody tr:nth-child(even){background:#0d1117}
+tbody tr:nth-child(odd){background:#0a0e1a}
+tbody tr:hover{background:#1a2234!important}
+tbody tr.selected{background:#1a2a3a!important;outline:2px solid #7ec8e3}
+td{padding:6px 10px;white-space:nowrap}
+td.date-cell{color:#888;font-size:11px}
+td.pillar{color:#ccc;font-size:12px;letter-spacing:1px}
+td.diary-mark{text-align:center;font-size:11px}
+
+.bar-wrap{display:flex;align-items:center;gap:6px}
+.bar{height:9px;border-radius:3px;min-width:2px;transition:.3s}
+.score-num{font-size:11px;font-weight:bold;min-width:32px}
+
+/* ─── 오른쪽: 일기 패널 ─── */
+.diary-panel{background:#111820;border-left:1px solid #1e2840;display:flex;flex-direction:column;overflow:hidden}
+.diary-header{padding:16px 18px 12px;border-bottom:1px solid #1e2840}
+.diary-header .selected-date{font-size:15px;font-weight:bold;color:#7ec8e3}
+.diary-header .score-summary{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
+.score-badge{font-size:11px;padding:4px 10px;border-radius:10px;font-weight:bold}
+
+.diary-body{flex:1;overflow-y:auto;padding:16px 18px}
+.field-group{margin-bottom:14px}
+.field-label{font-size:11px;color:#556;margin-bottom:5px;font-weight:bold;letter-spacing:.5px}
+.field-label span{color:#7ec8e3}
+textarea{width:100%;background:#0a0e1a;border:1px solid #1e2840;color:#ddd;border-radius:8px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;min-height:70px;line-height:1.5;outline:none;transition:.2s}
+textarea:focus{border-color:#7ec8e3;background:#0d1320}
+
+.diary-footer{padding:14px 18px;border-top:1px solid #1e2840;display:flex;gap:8px}
+.btn-save{flex:1;background:#7ec8e3;color:#0a0e1a;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:bold;cursor:pointer;transition:.2s}
+.btn-save:hover{background:#5ab8d8}
+.btn-del{background:transparent;border:1px solid #2a3040;color:#556;border-radius:8px;padding:12px 14px;cursor:pointer;font-size:13px;transition:.2s}
+.btn-del:hover{border-color:#ff6b6b;color:#ff6b6b}
+.diary-empty{color:#334;font-size:13px;margin-top:40px;text-align:center;padding:20px}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#7ec8e3;color:#0a0e1a;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:bold;opacity:0;transition:.3s;z-index:999}
+.toast.show{opacity:1}
+
+/* ─── 반응형 ─── */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .diary-panel{height:50vh;border-left:none;border-top:1px solid #1e2840}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🔮 나의 사주 운세 시스템 (1979~2079)</h1>
+    <div class="sub">신강(身强) 丙火 · 용신: 壬癸水·庚辛金 / 기신: 甲乙木·丙丁火</div>
+  </div>
+  <a href="/logout" class="logout">로그아웃</a>
+</div>
+
+<div class="layout">
+
+  <!-- ══ 왼쪽: 사주 테이블 ══ -->
+  <div class="table-panel">
+    <div class="toolbar">
+      <input type="text" id="q" placeholder="🔍 연도 검색 예) 2028" oninput="filterTable()">
+      <div class="tab-btns">
+        <button class="tab-btn active" onclick="setTab('job',this)">💼 취직운</button>
+        <button class="tab-btn" onclick="setTab('gui',this)">🌟 귀인운</button>
+        <button class="tab-btn" onclick="setTab('hlt',this)">❤️ 건강운</button>
+      </div>
+      <span id="count" style="font-size:11px;color:#445"></span>
+    </div>
+    <div class="legend">
+      <div class="leg"><span style="color:#00ff88">■</span> 최고(10↑)</div>
+      <div class="leg"><span style="color:#00c97a">■</span> 대길(6~10)</div>
+      <div class="leg"><span style="color:#7dff7d">■</span> 길(3~6)</div>
+      <div class="leg"><span style="color:#aaa">■</span> 평(0~3)</div>
+      <div class="leg"><span style="color:#ffaa44">■</span> 소흉(0~-3)</div>
+      <div class="leg"><span style="color:#ff6b6b">■</span> 흉(-3~-6)</div>
+      <div class="leg"><span style="color:#ff3333">■</span> 대흉(-6↓)</div>
+      <div class="leg"><span style="color:#7ec8e3">📝</span> 일기 있음</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th>
+          <th>연주·월주</th>
+          <th id="score-header">💼 취직 강도</th>
+          <th>📝</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- ══ 오른쪽: 일기 패널 ══ -->
+  <div class="diary-panel">
+    <div class="diary-header">
+      <div class="selected-date" id="sel-date">← 왼쪽에서 월을 선택하세요</div>
+      <div class="score-summary" id="score-summary"></div>
+    </div>
+    <div class="diary-body" id="diary-body">
+      <div class="diary-empty">날짜를 선택하면<br>사주 점수와 함께<br>4행 일기를 기록할 수 있습니다.</div>
+    </div>
+    <div class="diary-footer" id="diary-footer" style="display:none">
+      <button class="btn-del" onclick="deleteDiary()" title="삭제">🗑</button>
+      <button class="btn-save" onclick="saveDiary()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── 상태 ───
+let sajuData = [];      // 1201개월 사주 데이터
+let diaryMap = {};      // { "2026년 04월": {f1,f2,f3,f4} }
+let currentTab = 'job'; // job | gui | hlt
+let selectedDate = null;
+
+const HEADERS = { job:'💼 취직 강도', gui:'🌟 귀인 강도', hlt:'❤️ 건강 강도' };
+const BADGE_LABELS = { job:'취직', gui:'귀인', hlt:'건강' };
+
+// ─── 색상/등급 ───
+function gradeColor(sc) {
+  if(sc>=10) return '#00ff88';
+  if(sc>=6)  return '#00c97a';
+  if(sc>=3)  return '#7dff7d';
+  if(sc>=0)  return '#aaaaaa';
+  if(sc>=-3) return '#ffaa44';
+  if(sc>=-6) return '#ff6b6b';
+  return '#ff3333';
+}
+function gradeText(sc) {
+  if(sc>=10) return '최고';
+  if(sc>=6)  return '대길';
+  if(sc>=3)  return '길';
+  if(sc>=0)  return '평';
+  if(sc>=-3) return '소흉';
+  if(sc>=-6) return '흉';
+  if(sc>=-10)return '대흉';
+  return '최흉';
+}
+
+function barHtml(sc) {
+  const color = gradeColor(sc);
+  const pct = Math.min(Math.abs(sc)/15*120, 120);
+  return `<div class="bar-wrap">
+    <div class="bar" style="width:${pct}px;background:${color}"></div>
+    <span class="score-num" style="color:${color}">${sc>0?'+':''}${sc}</span>
+    <span style="font-size:10px;color:${color}">${gradeText(sc)}</span>
+  </div>`;
+}
+
+// ─── 데이터 로드 ───
+async function loadAll() {
+  const [sajuRes, diaryRes] = await Promise.all([
+    fetch('/api/saju'),
+    fetch('/api/diary')
+  ]);
+  sajuData = await sajuRes.json();
+  const diaryArr = await diaryRes.json();
+  diaryMap = {};
+  diaryArr.forEach(d => diaryMap[d.date] = d);
+  renderTable();
+}
+
+// ─── 테이블 렌더 ───
+function renderTable() {
+  const q = document.getElementById('q').value;
+  document.getElementById('score-header').textContent = HEADERS[currentTab];
+  const rows = sajuData.filter(r => !q || r.date.includes(q));
+  document.getElementById('count').textContent = `${rows.length}개월`;
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = rows.map(r => {
+    const sc = r[currentTab];
+    const hasDiary = diaryMap[r.date] ? '📝' : '';
+    const sel = r.date === selectedDate ? 'class="selected"' : '';
+    return `<tr ${sel} onclick="selectRow('${r.date}')">
+      <td class="date-cell">${r.date}</td>
+      <td class="pillar">${r.yp}&nbsp;${r.mp}</td>
+      <td>${barHtml(sc)}</td>
+      <td class="diary-mark">${hasDiary}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTable() { renderTable(); }
+function setTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+  if(selectedDate) selectRow(selectedDate);
+}
+
+// ─── 행 선택 → 일기 패널 ───
+function selectRow(date) {
+  selectedDate = date;
+  renderTable(); // 선택 표시 갱신
+
+  const row = sajuData.find(r => r.date === date);
+  document.getElementById('sel-date').textContent = `📅 ${date}  ${row.yp} ${row.mp}`;
+
+  // 점수 배지
+  const summary = document.getElementById('score-summary');
+  summary.innerHTML = ['job','gui','hlt'].map(k => {
+    const sc = row[k];
+    const bg = gradeColor(sc)+'22';
+    const col = gradeColor(sc);
+    return `<span class="score-badge" style="background:${bg};color:${col};border:1px solid ${col}">
+      ${BADGE_LABELS[k]} ${sc>0?'+':''}${sc} ${gradeText(sc)}
+    </span>`;
+  }).join('');
+
+  // 일기 폼
+  const diary = diaryMap[date] || {};
+  document.getElementById('diary-body').innerHTML = `
+    <div class="field-group">
+      <div class="field-label"><span>① 사실</span> — 이달 어떤 일이 있었나요?</div>
+      <textarea id="f1" placeholder="구체적인 사건/행동">${diary.f1||''}</textarea>
+    </div>
+    <div class="field-group">
+      <div class="field-label"><span>② 감정</span> — 솔직한 내 마음은?</div>
+      <textarea id="f2" placeholder="기분·감정·느낌">${diary.f2||''}</textarea>
+    </div>
+    <div class="field-group">
+      <div class="field-label"><span>③ 배움</span> — 이 시기를 통해 배운 점은?</div>
+      <textarea id="f3" placeholder="깨달음·교훈·성장">${diary.f3||''}</textarea>
+    </div>
+    <div class="field-group">
+      <div class="field-label"><span>④ 선언</span> — 나를 위한 다음 다짐은?</div>
+      <textarea id="f4" placeholder="의지·목표·계획">${diary.f4||''}</textarea>
+    </div>
+  `;
+  document.getElementById('diary-footer').style.display = 'flex';
+
+  // 선택 행 스크롤 유지
+  const tr = document.querySelector('#tbody tr.selected');
+  if(tr) tr.scrollIntoView({block:'nearest'});
+}
+
+// ─── 저장 ───
+async function saveDiary() {
+  if(!selectedDate) return;
+  const body = {
+    date: selectedDate,
+    f1: document.getElementById('f1').value,
+    f2: document.getElementById('f2').value,
+    f3: document.getElementById('f3').value,
+    f4: document.getElementById('f4').value,
+  };
+  const res = await fetch('/api/diary', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if((await res.json()).ok) {
+    diaryMap[selectedDate] = body;
+    renderTable();
+    showToast('✅ 저장 완료');
+  }
+}
+
+// ─── 삭제 ───
+async function deleteDiary() {
+  if(!selectedDate || !diaryMap[selectedDate]) return;
+  if(!confirm(`${selectedDate} 일기를 삭제할까요?`)) return;
+  const res = await fetch(`/api/diary/${encodeURIComponent(selectedDate)}`, {method:'DELETE'});
+  if((await res.json()).ok) {
+    delete diaryMap[selectedDate];
+    renderTable();
+    showToast('🗑 삭제 완료');
+    selectRow(selectedDate);
+  }
+}
+
+// ─── 토스트 ───
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ─── 초기 로드 ───
+loadAll();
+</script>
+</body>
+</html>
