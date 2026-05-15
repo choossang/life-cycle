@@ -21,6 +21,7 @@ app.secret_key = _secret
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=True,
 )
 
 # 비밀번호를 해시로만 보관 (평문 메모리 상주 방지)
@@ -39,8 +40,9 @@ VALID_YEAR_MONTH = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 KOREAN_YEAR_MONTH = re.compile(r"^(\d{4})\s*년\s*(\d{1,2})\s*월$")
 
 
-def error_response(error: str, status: int = 400):
-    return jsonify({"error": error}), status
+def error_response(error: str, status: int = 400, *, code: str | None = None):
+    payload = {"error": error, "code": code or error}
+    return jsonify(payload), status
 
 
 def get_db_connection():
@@ -51,12 +53,14 @@ def get_db_connection():
 
 def normalize_input_date(value: str, *, allow_korean: bool = False):
     """Normalize year-month input; optionally accepts Korean legacy format."""
-    if not value:
+    if value is None:
         return None
-    value = value.strip()
-
     if not isinstance(value, str):
         value = str(value)
+
+    value = value.strip()
+    if not value:
+        return None
 
     if VALID_YEAR_MONTH.fullmatch(value):
         return value

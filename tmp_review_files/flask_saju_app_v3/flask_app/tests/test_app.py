@@ -96,8 +96,11 @@ class DiarySchemaMigrationTests(unittest.TestCase):
             json={"date": "1979년 02월", "f1": "text"},
         )
 
+        body = response.get_json() or {}
+
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {"error": "invalid_date"})
+        self.assertEqual(body.get("code"), "invalid_date")
+        self.assertIn("error", body)
 
     def test_legacy_dates_are_normalized_on_init(self):
         self._setup_legacy_db()
