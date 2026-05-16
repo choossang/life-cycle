@@ -529,6 +529,8 @@ class DiarySchemaMigrationTests(unittest.TestCase):
 
         html = response.get_data(as_text=True)
         self.assertIn("const csrfToken = \"", html)
+        self.assertIn("let selectedDisplayDate", html)
+        self.assertIn("let selectedMonthKey", html)
         self.assertIn("function toMonthKey", html)
         self.assertIn("X-CSRF-Token", html)
         self.assertIn("/api/saju", html)

@@ -337,53 +337,62 @@ function selectRow(displayDate) {
 async function saveDiary() {
   if(!selectedMonthKey) return;
 
-  const body = {
-    date: selectedMonthKey,
-    f1: document.getElementById('f1').value,
-    f2: document.getElementById('f2').value,
-    f3: document.getElementById('f3').value,
-    f4: document.getElementById('f4').value,
-  };
+  try {
+    const body = {
+      date: selectedMonthKey,
+      f1: document.getElementById('f1').value,
+      f2: document.getElementById('f2').value,
+      f3: document.getElementById('f3').value,
+      f4: document.getElementById('f4').value,
+    };
 
-  const res = await fetch('/api/diary', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'X-CSRF-Token': csrfToken,
-    },
-    body: JSON.stringify(body)
-  });
+    const res = await fetch('/api/diary', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify(body)
+    });
 
-  const data = await parseJsonResponse(res);
-  if (res.ok && data && data.ok) {
-    diaryMap[selectedMonthKey] = {...(diaryMap[selectedMonthKey] || {}), ...body};
-    renderTable();
-    showToast('저장 완료');
-    return;
+    const data = await parseJsonResponse(res);
+    if (res.ok && data && data.ok) {
+      diaryMap[selectedMonthKey] = {...(diaryMap[selectedMonthKey] || {}), ...body};
+      renderTable();
+      showToast('저장 완료');
+      return;
+    }
+
+    showToast((data && data.error) || '저장에 실패했습니다.');
+  } catch (err) {
+    showToast(err && err.message ? err.message : '저장 중 오류가 발생했습니다.');
   }
-
-  showToast((data && data.error) || '저장에 실패했습니다.');
 }
 
 async function deleteDiary() {
   if(!selectedMonthKey || !diaryMap[selectedMonthKey]) return;
+
   if(!confirm(`${selectedDisplayDate || selectedMonthKey} 일기를 삭제할까요?`)) return;
 
-  const res = await fetch(`/api/diary/${encodeURIComponent(selectedMonthKey)}`, {
-    method:'DELETE',
-    headers:{'X-CSRF-Token': csrfToken}
-  });
+  try {
+    const res = await fetch(`/api/diary/${encodeURIComponent(selectedMonthKey)}`, {
+      method:'DELETE',
+      headers:{'X-CSRF-Token': csrfToken}
+    });
 
-  const data = await parseJsonResponse(res);
-  if (res.ok && data && data.ok) {
-    delete diaryMap[selectedMonthKey];
-    renderTable();
-    showToast('삭제 완료');
-    selectRow(selectedDisplayDate || selectedMonthKey);
-    return;
+    const data = await parseJsonResponse(res);
+    if (res.ok && data && data.ok) {
+      delete diaryMap[selectedMonthKey];
+      renderTable();
+      showToast('삭제 완료');
+      selectRow(selectedDisplayDate || selectedMonthKey);
+      return;
+    }
+
+    showToast((data && data.error) || '삭제에 실패했습니다.');
+  } catch (err) {
+    showToast(err && err.message ? err.message : '삭제 중 오류가 발생했습니다.');
   }
-
-  showToast((data && data.error) || '삭제에 실패했습니다.');
 }
 
 function showToast(msg) {
