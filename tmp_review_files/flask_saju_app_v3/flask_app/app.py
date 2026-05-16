@@ -277,6 +277,9 @@ def score_band_summary(score):
     except (TypeError, ValueError):
         return "해석 정보 없음"
 
+    if not math.isfinite(numeric):
+        return "해석 정보 없음"
+
     if numeric >= 70:
         return "강점 구간"
     if numeric >= 40:
@@ -288,7 +291,10 @@ def confidence_phrase(confidence):
     try:
         numeric = float(confidence)
     except (TypeError, ValueError):
-        return "기본 신뢰"
+        return "신뢰 정보 없음"
+
+    if not math.isfinite(numeric):
+        return "신뢰 정보 없음"
 
     if numeric >= 0.8:
         return "높은 신뢰"
@@ -310,18 +316,26 @@ def build_label_interpretation(label, score, evidence, confidence):
     return f"{label_name}: {summary} ({trust}). 근거: {evidence_text}"
 
 
-def load_saju_data_index():
+def load_saju_data_rows():
     json_path = os.path.join(os.path.dirname(__file__), "saju_data.json")
     if not os.path.exists(json_path):
-        return {}
+        return []
 
-    with open(json_path, encoding="utf-8") as f:
-        rows = json.load(f)
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            rows = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
 
+    if not isinstance(rows, list):
+        return []
+
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def load_saju_data_index():
     index = {}
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
+    for row in load_saju_data_rows():
         key = normalize_input_date(row.get("date"), allow_korean=True)
         if not key:
             continue

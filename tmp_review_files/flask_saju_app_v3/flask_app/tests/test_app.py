@@ -436,3 +436,87 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertIn("gui", rows[0])
         self.assertIn("hlt", rows[0])
         self.assertNotIn("interpretation", rows[0])
+
+    def test_diary_get_returns_fallback_interpretation_when_saju_row_missing(self):
+        self._login()
+
+        save_response = self.client.post(
+            "/api/diary",
+            json={
+                "date": "2026-01",
+                "f1": "실험 메모",
+                "f2": "협업 관련 기록",
+                "f3": "운동을 늘렸다",
+                "f4": "메모",
+            },
+            headers=self._csrf_header(),
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        response = self.client.get("/api/diary")
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.get_json() or []
+        self.assertEqual(len(rows), 1)
+        interpretation = rows[0].get("interpretation")
+        self.assertIsInstance(interpretation, dict)
+        for key in ("job", "gui", "hlt"):
+            self.assertIn("해석 정보 없음", interpretation[key])
+
+    def test_diary_get_blank_evidence_fields_fallback_to_missing_record(self):
+        self._login()
+
+        save_response = self.client.post(
+            "/api/diary",
+            json={
+                "date": "1979-02",
+                "f1": "",
+                "f2": "   ",
+                "f3": "\t",
+                "f4": "",
+            },
+            headers=self._csrf_header(),
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        response = self.client.get("/api/diary")
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.get_json() or []
+        self.assertEqual(len(rows), 1)
+        interpretation = rows[0].get("interpretation")
+        self.assertIn("근거: 기록 없음", interpretation["job"])
+        self.assertIn("근거: 기록 없음", interpretation["gui"])
+        self.assertIn("근거: 기록 없음", interpretation["hlt"])
+        self.assertTrue(interpretation["job"].startswith("일/역할:"))
+        self.assertTrue(interpretation["gui"].startswith("관계:"))
+        self.assertTrue(interpretation["hlt"].startswith("건강:"))
+
+    def test_diary_get_handles_malformed_saju_json_by_fallback(self):
+        self.saju_data_path.write_text("{bad json", encoding="utf-8")
+
+        self._login()
+
+        save_response = self.client.post(
+            "/api/diary",
+            json={
+                "date": "1979-02",
+                "f1": "새로운 프로젝트를 시작했다",
+                "f2": "팀원들과 합의했다",
+                "f3": "컨디션이 좋다",
+                "f4": "긍정적",
+            },
+            headers=self._csrf_header(),
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        response = self.client.get("/api/diary")
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.get_json() or []
+        self.assertEqual(len(rows), 1)
+        interpretation = rows[0].get("interpretation")
+        self.assertIsInstance(interpretation, dict)
+        for key in ("job", "gui", "hlt"):
+            self.assertIn("해석 정보 없음", interpretation[key])
+            self.assertIn("근거:", interpretation[key])
