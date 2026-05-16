@@ -423,9 +423,7 @@ def index():
 def saju_api():
     if not session.get("ok"):
         return jsonify({"error": "unauthorized"}), 401
-    json_path = os.path.join(os.path.dirname(__file__), "saju_data.json")
-    with open(json_path, encoding="utf-8") as f:
-        return jsonify(json.load(f))
+    return jsonify(load_saju_data_rows())
 
 
 # ════════════════════════════════════════

@@ -424,6 +424,23 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertIn("hlt", interpretation)
         self.assertIn("새로운 역할 제안을 받았다", interpretation["job"])
 
+    def test_saju_api_returns_empty_list_when_json_is_malformed(self):
+        self.saju_data_path.write_text("{bad json", encoding="utf-8")
+        self._login()
+
+        response = self.client.get("/api/saju")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), [])
+
+    def test_saju_api_returns_empty_list_when_file_is_missing(self):
+        if self.saju_data_path.exists():
+            self.saju_data_path.unlink()
+        self._login()
+
+        response = self.client.get("/api/saju")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), [])
+
     def test_saju_api_remains_raw_scores_without_interpretation(self):
         self._login()
 
