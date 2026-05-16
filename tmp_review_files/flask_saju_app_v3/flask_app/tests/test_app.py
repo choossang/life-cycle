@@ -520,3 +520,16 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         for key in ("job", "gui", "hlt"):
             self.assertIn("해석 정보 없음", interpretation[key])
             self.assertIn("근거:", interpretation[key])
+
+    def test_index_template_bootstraps_csrf_month_key_and_fetch_headers(self):
+        self._login()
+
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+
+        html = response.get_data(as_text=True)
+        self.assertIn("const csrfToken = \"", html)
+        self.assertIn("function toMonthKey", html)
+        self.assertIn("X-CSRF-Token", html)
+        self.assertIn("/api/saju", html)
+        self.assertIn("/api/diary", html)
