@@ -28,7 +28,7 @@
 - 관련 문서: `docs/superpowers/specs/2026-05-16-saju-flask-app-completion-design.md`
 
 ## 글쓰기 스킬 패키지 위치
-- 패키지 전체는 `writing/`에 있습니다.
+- 패키지 zip은 `writing/writing-skills.zip`에 있으며, 풀어서 설치한 패키지는 `writing/`에 존재합니다.
 - 패키지 설치와 사용 절차는 `writing/INSTALL.md`를 따르세요.
 - `writing/INSTALL.md`에서 스킬 폴더 설치, 점검, 시작 문구를 확인할 수 있습니다.
 
