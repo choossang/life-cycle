@@ -102,6 +102,19 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertEqual(body.get("code"), "invalid_date")
         self.assertIn("error", body)
 
+    def test_reject_non_string_date(self):
+        self._login()
+        response = self.client.post(
+            "/api/diary",
+            json={"date": 202601, "f1": "text"},
+        )
+
+        body = response.get_json() or {}
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_date")
+        self.assertIn("error", body)
+
     def test_legacy_dates_are_normalized_on_init(self):
         self._setup_legacy_db()
         self._load_app()

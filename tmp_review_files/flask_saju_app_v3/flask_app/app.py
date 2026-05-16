@@ -18,10 +18,12 @@ if not _secret or not _pw:
 
 app.secret_key = _secret
 
+cookie_secure_env = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() in {"1", "true", "yes", "on"}
+
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SECURE=cookie_secure_env,
 )
 
 # 비밀번호를 해시로만 보관 (평문 메모리 상주 방지)
@@ -56,7 +58,7 @@ def normalize_input_date(value: str, *, allow_korean: bool = False):
     if value is None:
         return None
     if not isinstance(value, str):
-        value = str(value)
+        return None
 
     value = value.strip()
     if not value:
@@ -263,10 +265,11 @@ def diary_save():
     if not session.get("ok"):
         return error_response("unauthorized", 401)
 
-    data = request.get_json(silent=True) or {}
-    date_raw = data.get("date", "").strip() if isinstance(data, dict) else ""
+    data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("invalid_payload")
+
+    date_raw = data.get("date")
     date = normalize_input_date(date_raw)
     if not date:
         return error_response("invalid_date")
