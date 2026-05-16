@@ -138,9 +138,14 @@ def normalize_existing_diary_dates():
     ensure_diary_schema()
     normalized_rows = []
 
+    def _is_empty(value):
+        return value is None or value == ""
+
     with get_db_connection() as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT rowid, date FROM diary").fetchall()
+        rows = conn.execute(
+            "SELECT rowid, date, f1, f2, f3, f4, entry_type, confidence, source_note FROM diary"
+        ).fetchall()
 
         for row in rows:
             normalized = normalize_input_date(row["date"], allow_korean=True)
@@ -150,12 +155,45 @@ def normalize_existing_diary_dates():
             if normalized == row["date"]:
                 continue
 
-            # Remove duplicate normalized date rows if they already exist.
-            exists = conn.execute(
-                "SELECT rowid FROM diary WHERE date = ? AND rowid != ?",
-                (normalized, row["rowid"]),
+            existing = conn.execute(
+                "SELECT rowid, f1, f2, f3, f4, entry_type, confidence, source_note, created_at, updated FROM diary WHERE date = ?",
+                (normalized,),
             ).fetchone()
-            if exists:
+
+            if existing:
+                payload = {
+                    "f1": existing["f1"] if not _is_empty(existing["f1"]) else row["f1"],
+                    "f2": existing["f2"] if not _is_empty(existing["f2"]) else row["f2"],
+                    "f3": existing["f3"] if not _is_empty(existing["f3"]) else row["f3"],
+                    "f4": existing["f4"] if not _is_empty(existing["f4"]) else row["f4"],
+                    "entry_type": existing["entry_type"] if not _is_empty(existing["entry_type"]) else row["entry_type"],
+                    "confidence": existing["confidence"] if existing["confidence"] is not None else row["confidence"],
+                    "source_note": existing["source_note"] if not _is_empty(existing["source_note"]) else row["source_note"],
+                }
+                conn.execute(
+                    """
+                    UPDATE diary
+                    SET
+                        f1 = ?,
+                        f2 = ?,
+                        f3 = ?,
+                        f4 = ?,
+                        entry_type = ?,
+                        confidence = ?,
+                        source_note = ?
+                    WHERE date = ?
+                    """,
+                    (
+                        payload["f1"],
+                        payload["f2"],
+                        payload["f3"],
+                        payload["f4"],
+                        payload["entry_type"],
+                        payload["confidence"],
+                        payload["source_note"],
+                        normalized,
+                    ),
+                )
                 conn.execute("DELETE FROM diary WHERE rowid = ?", (row["rowid"],))
             else:
                 conn.execute(

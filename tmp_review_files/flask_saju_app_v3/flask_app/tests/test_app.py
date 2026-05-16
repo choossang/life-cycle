@@ -71,6 +71,44 @@ class DiarySchemaMigrationTests(unittest.TestCase):
                 ),
             )
 
+    def _setup_legacy_db_with_collision(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DROP TABLE IF EXISTS diary")
+            conn.execute(
+                """
+                CREATE TABLE diary (
+                    date TEXT PRIMARY KEY,
+                    f1 TEXT DEFAULT '',
+                    f2 TEXT DEFAULT '',
+                    f3 TEXT DEFAULT '',
+                    f4 TEXT DEFAULT '',
+                    updated TEXT
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO diary (date, f1, f2, f3, f4, updated) VALUES (?,?,?,?,?,?)",
+                (
+                    "1979-02",
+                    "normalized",
+                    None,
+                    "normalized3",
+                    None,
+                    "2026-01-01T00:00:00",
+                ),
+            )
+            conn.execute(
+                "INSERT INTO diary (date, f1, f2, f3, f4, updated) VALUES (?,?,?,?,?,?)",
+                (
+                    "1979년 02월",
+                    None,
+                    "legacy2",
+                    None,
+                    "legacy4",
+                    "2026-01-01T00:00:00",
+                ),
+            )
+
     def test_schema_has_new_columns(self):
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute("PRAGMA table_info(diary)").fetchall()
@@ -139,3 +177,21 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         normalized_rows = self.app_module.normalize_existing_diary_dates()
         self.assertEqual(len(normalized_rows), 1)
         self.assertEqual(normalized_rows[0]["date"], "1979-02")
+
+    def test_normalized_and_legacy_rows_merge_without_data_loss(self):
+        self._setup_legacy_db_with_collision()
+        self._load_app()
+        self._login()
+
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+
+        rows = self.app_module.normalize_existing_diary_dates()
+        self.assertEqual(len(rows), 1)
+
+        row = rows[0]
+        self.assertEqual(row["date"], "1979-02")
+        self.assertEqual(row["f1"], "normalized")
+        self.assertEqual(row["f2"], "legacy2")
+        self.assertEqual(row["f3"], "normalized3")
+        self.assertEqual(row["f4"], "legacy4")
