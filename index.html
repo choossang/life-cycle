@@ -3,60 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Life Cycle Repository Hub</title>
+  <title>Life Cycle</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0b1220; color: #e6edf3; }
-    .wrap { max-width: 960px; margin: 48px auto; padding: 0 20px; }
-    .hero, .card { background: #111a2b; border: 1px solid #26334d; border-radius: 14px; }
-    .hero { padding: 28px; margin-bottom: 22px; }
-    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-    .card { padding: 20px; }
-    h1 { margin: 0 0 10px; font-size: 30px; }
-    h2 { margin: 0 0 10px; font-size: 18px; }
-    p, li { color: #b7c3d4; line-height: 1.6; }
-    a { color: #9cd1ff; }
-    .link-list { display: grid; gap: 10px; margin-top: 14px; }
-    .link-list a { display: block; text-decoration: none; background: #0f1728; border: 1px solid #2b3a58; padding: 12px 14px; border-radius: 10px; }
-    .link-list a:hover { border-color: #4ea1ff; }
-    .note { margin-top: 18px; font-size: 13px; color: #9fb0c6; }
+    .wrap { max-width: 840px; margin: 48px auto; padding: 0 20px; }
+    .card { background: #111a2b; border: 1px solid #26334d; border-radius: 14px; padding: 24px; }
+    h1 { margin: 0 0 10px; font-size: 28px; }
+    p { color: #b7c3d4; line-height: 1.6; }
+    .links { display: grid; gap: 10px; margin-top: 18px; }
+    a { display: block; text-decoration: none; color: #9cd1ff; background: #0f1728; border: 1px solid #2b3a58; padding: 12px 14px; border-radius: 10px; }
+    a:hover { border-color: #4ea1ff; }
+    .note { margin-top: 16px; font-size: 13px; color: #9fb0c6; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <section class="hero">
+    <div class="card">
       <h1>Life Cycle</h1>
-      <p>이 저장소는 공개 문서, Flask 사주 앱 산출물, 글쓰기 스킬 패키지를 함께 담고 있는 작업 허브입니다.</p>
-      <p class="note">원하는 목적에 따라 아래 세 갈래 중 하나로 바로 이동하세요.</p>
-    </section>
+      <p>이 페이지는 저장소 작업 화면입니다. GitHub Pages 공개 산출물은 아래의 배포 기준 링크로 확인하세요.</p>
 
-    <section class="grid">
-      <article class="card">
-        <h2>공개 페이지 / 문서</h2>
-        <p>GitHub Pages에서 바로 볼 수 있는 공개 문서와 산출물 허브입니다.</p>
-        <div class="link-list">
-          <a href="docs/index.html">docs/index.html 열기</a>
-        </div>
-      </article>
+      <div class="links">
+        <a href="docs/index.html">GitHub Pages 홈 보기</a>
+        <a href="docs/essay.html">에세이 보기</a>
+        <a href="docs/INSTALL.md">설치 안내 보기</a>
+        <a href="docs/superpowers/specs/">설계 문서 모음 보기</a>
+      </div>
 
-      <article class="card">
-        <h2>Flask 사주 앱 산출물</h2>
-        <p>사주 앱 구현물, 설계 문서, 템플릿 파일이 모여 있는 작업 영역입니다.</p>
-        <div class="link-list">
-          <a href="tmp_review_files/flask_saju_app_v3/flask_app/templates/index.html">Flask 앱 Jinja 템플릿 소스(index.html) 보기</a>
-          <span style="display:none">tmp_review_files/flask_saju_app_v3/flask_app/</span>
-          <a href="docs/superpowers/specs/2026-05-16-saju-flask-app-completion-design.md">사주 앱 최신 설계서 보기</a>
-        </div>
-      </article>
-
-      <article class="card">
-        <h2>글쓰기 스킬 패키지</h2>
-        <p>Claude Code용 글쓰기 12단계 스킬 패키지와 설치 안내입니다.</p>
-        <div class="link-list">
-          <a href="INSTALL.md">저장소 사용 안내 보기</a>
-          <a href="writing/INSTALL.md">패키지 설치 안내 보기</a>
-        </div>
-      </article>
-    </section>
+      <p class="note">공개 기준 주소는 <code>/life-cycle/</code> 아래의 <code>docs/</code> 배포 구조를 사용합니다.</p>
+    </div>
   </div>
 </body>
 </html>
