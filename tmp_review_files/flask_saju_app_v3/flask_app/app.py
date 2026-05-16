@@ -90,7 +90,7 @@ def get_csrf_token():
 def require_csrf():
     expected = session.get("csrf_token")
     provided = request.headers.get("X-CSRF-Token")
-    if not expected or not provided or provided != expected:
+    if not expected or not provided or not secrets.compare_digest(str(provided), str(expected)):
         return error_response("csrf validation failed", 403, code="csrf_failed")
     return None
 

@@ -263,6 +263,70 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertEqual(body.get("code"), "csrf_failed")
         self.assertIn("error", body)
 
+    def test_diary_delete_with_valid_csrf_removes_row(self):
+        self._login()
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO diary (date, f1, f2, f3, f4, entry_type, confidence, source_note, created_at, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'), datetime('now','localtime'))",
+                ("2026-01", "a", "b", "c", "d", "manual", 1.0, ""),
+            )
+
+        response = self.client.delete(
+            "/api/diary/2026-01",
+            headers=self._csrf_header(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        with sqlite3.connect(self.db_path) as conn:
+            count = conn.execute("SELECT COUNT(*) FROM diary WHERE date = ?", ("2026-01",)).fetchone()[0]
+
+        self.assertEqual(count, 0)
+
+    def test_diary_post_rejects_invalid_payload_shape(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            data=json.dumps([1, 2, 3]),
+            content_type="application/json",
+            headers=self._csrf_header(),
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_payload")
+        self.assertIn("error", body)
+
+    def test_diary_post_rejects_non_string_f1(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={"date": "2026-01", "f1": 123},
+            headers=self._csrf_header(),
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_f1")
+        self.assertIn("error", body)
+
+    def test_diary_post_rejects_invalid_confidence(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={"date": "2026-01", "f1": "text", "confidence": 3},
+            headers=self._csrf_header(),
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_confidence")
+        self.assertIn("error", body)
+
     def test_diary_post_rejects_invalid_entry_type(self):
         self._login()
 
