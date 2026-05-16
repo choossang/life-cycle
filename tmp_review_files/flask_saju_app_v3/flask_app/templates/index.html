@@ -187,10 +187,32 @@ function gradeText(sc) {
   return '최흉';
 }
 
-function barHtml(sc) {
+function buildScoreBar(sc) {
   const color = gradeColor(sc);
   const pct = Math.min(Math.abs(sc)/15*120, 120);
-  return `<div class="bar-wrap"><div class="bar" style="width:${pct}px;background:${color}"></div><span class="score-num" style="color:${color}">${sc>0?'+':''}${sc}</span><span style="font-size:10px;color:${color}">${gradeText(sc)}</span></div>`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bar-wrap';
+
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  bar.style.width = `${pct}px`;
+  bar.style.background = color;
+
+  const score = document.createElement('span');
+  score.className = 'score-num';
+  score.style.color = color;
+  score.textContent = `${sc > 0 ? '+' : ''}${sc}`;
+
+  const grade = document.createElement('span');
+  grade.style.fontSize = '10px';
+  grade.style.color = color;
+  grade.textContent = gradeText(sc);
+
+  wrap.appendChild(bar);
+  wrap.appendChild(score);
+  wrap.appendChild(grade);
+  return wrap;
 }
 
 async function parseJsonResponse(res) {
@@ -203,24 +225,30 @@ async function parseJsonResponse(res) {
   return data;
 }
 
+async function refreshDiaryMapFromServer() {
+  const diaryRes = await fetch('/api/diary');
+  if (!diaryRes.ok) {
+    throw new Error('일기 데이터를 불러오지 못했습니다.');
+  }
+
+  const diaryArr = await diaryRes.json();
+  const nextDiaryMap = {};
+  diaryArr.forEach(d => {
+    const monthKey = toMonthKey(d.date);
+    if (monthKey) nextDiaryMap[monthKey] = d;
+  });
+  diaryMap = nextDiaryMap;
+}
+
 async function loadAll() {
   try {
-    const [sajuRes, diaryRes] = await Promise.all([
-      fetch('/api/saju'),
-      fetch('/api/diary')
-    ]);
-
-    if (!sajuRes.ok || !diaryRes.ok) {
+    const sajuRes = await fetch('/api/saju');
+    if (!sajuRes.ok) {
       throw new Error('초기 데이터를 불러오지 못했습니다.');
     }
 
     sajuData = await sajuRes.json();
-    const diaryArr = await diaryRes.json();
-    diaryMap = {};
-    diaryArr.forEach(d => {
-      const monthKey = toMonthKey(d.date);
-      if (monthKey) diaryMap[monthKey] = d;
-    });
+    await refreshDiaryMapFromServer();
     renderTable();
   } catch (err) {
     showToast(err.message || '데이터 로드 실패');
@@ -234,13 +262,38 @@ function renderTable() {
   document.getElementById('count').textContent = `${rows.length}개월`;
 
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = rows.map(r => {
+  tbody.textContent = '';
+
+  rows.forEach((r) => {
     const sc = r[currentTab];
     const monthKey = toMonthKey(r.date);
-    const hasDiary = monthKey && diaryMap[monthKey] ? '📝' : '';
-    const sel = monthKey && monthKey === selectedMonthKey ? 'class="selected"' : '';
-    return `<tr ${sel} onclick="selectRow('${r.date}')"><td class="date-cell">${r.date}</td><td class="pillar">${r.yp}&nbsp;${r.mp}</td><td>${barHtml(sc)}</td><td class="diary-mark">${hasDiary}</td></tr>`;
-  }).join('');
+    const tr = document.createElement('tr');
+    if (monthKey && monthKey === selectedMonthKey) {
+      tr.classList.add('selected');
+    }
+    tr.addEventListener('click', () => selectRow(r.date));
+
+    const dateCell = document.createElement('td');
+    dateCell.className = 'date-cell';
+    dateCell.textContent = r.date;
+
+    const pillarCell = document.createElement('td');
+    pillarCell.className = 'pillar';
+    pillarCell.textContent = `${r.yp || ''} ${r.mp || ''}`.trim();
+
+    const scoreCell = document.createElement('td');
+    scoreCell.appendChild(buildScoreBar(sc));
+
+    const diaryMarkCell = document.createElement('td');
+    diaryMarkCell.className = 'diary-mark';
+    diaryMarkCell.textContent = monthKey && diaryMap[monthKey] ? '📝' : '';
+
+    tr.appendChild(dateCell);
+    tr.appendChild(pillarCell);
+    tr.appendChild(scoreCell);
+    tr.appendChild(diaryMarkCell);
+    tbody.appendChild(tr);
+  });
 }
 
 function filterTable() { renderTable(); }

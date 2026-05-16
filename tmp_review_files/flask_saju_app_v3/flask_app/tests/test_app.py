@@ -535,3 +535,17 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertIn("X-CSRF-Token", html)
         self.assertIn("/api/saju", html)
         self.assertIn("/api/diary", html)
+        self.assertIn("function refreshDiaryMapFromServer", html)
+        self.assertIn("await refreshDiaryMapFromServer()", html)
+        self.assertIn("selectRow(selectedDisplayDate || selectedMonthKey)", html)
+
+    def test_index_template_avoids_inline_row_click_handlers(self):
+        self._login()
+
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+
+        html = response.get_data(as_text=True)
+        self.assertIn("document.createElement('tr')", html)
+        self.assertIn("tr.addEventListener('click'", html)
+        self.assertNotIn("onclick=\"selectRow(", html)
