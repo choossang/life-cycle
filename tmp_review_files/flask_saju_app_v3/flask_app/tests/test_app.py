@@ -327,6 +327,34 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertEqual(body.get("code"), "invalid_confidence")
         self.assertIn("error", body)
 
+    def test_diary_post_rejects_invalid_confidence_non_finite(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={"date": "2026-01", "f1": "text", "confidence": float('nan')},
+            headers=self._csrf_header(),
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_confidence")
+        self.assertIn("error", body)
+
+    def test_diary_post_rejects_invalid_confidence_inf(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={"date": "2026-01", "f1": "text", "confidence": float('inf')},
+            headers=self._csrf_header(),
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_confidence")
+        self.assertIn("error", body)
+
     def test_diary_post_rejects_invalid_entry_type(self):
         self._login()
 

@@ -7,6 +7,7 @@ import time
 import json
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+import math
 
 
 app = Flask(__name__)
@@ -122,7 +123,7 @@ def validate_confidence(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None, error_response("invalid confidence", 400, code="invalid_confidence")
     numeric = float(value)
-    if numeric < 0.0 or numeric > 1.0:
+    if math.isfinite(numeric) is False or numeric < 0.0 or numeric > 1.0:
         return None, error_response("invalid confidence", 400, code="invalid_confidence")
     return numeric, None
 
