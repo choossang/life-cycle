@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import secrets
 import sqlite3
 import time
 import json
@@ -76,6 +77,54 @@ def normalize_input_date(value: str, *, allow_korean: bool = False):
                 return f"{year}-{month:02d}"
 
     return None
+
+
+def get_csrf_token():
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+def require_csrf():
+    expected = session.get("csrf_token")
+    provided = request.headers.get("X-CSRF-Token")
+    if not expected or not provided or provided != expected:
+        return error_response("csrf validation failed", 403, code="csrf_failed")
+    return None
+
+
+def validate_text_field(value, field_name: str, *, max_length: int = 5000, default: str = ""):
+    if value is None:
+        return default, None
+    if not isinstance(value, str):
+        return None, error_response(f"{field_name} must be string", 400, code=f"invalid_{field_name}")
+    if len(value) > max_length:
+        return None, error_response(f"{field_name} too long", 400, code=f"invalid_{field_name}")
+    return value, None
+
+
+def validate_entry_type(value):
+    if value is None:
+        return "manual", None
+    if not isinstance(value, str):
+        return None, error_response("invalid entry_type", 400, code="invalid_entry_type")
+    normalized = value.strip().lower()
+    if normalized not in {"manual", "retro"}:
+        return None, error_response("invalid entry_type", 400, code="invalid_entry_type")
+    return normalized, None
+
+
+def validate_confidence(value):
+    if value is None:
+        return 1.0, None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None, error_response("invalid confidence", 400, code="invalid_confidence")
+    numeric = float(value)
+    if numeric < 0.0 or numeric > 1.0:
+        return None, error_response("invalid confidence", 400, code="invalid_confidence")
+    return numeric, None
 
 
 def _column_names(conn, table_name: str):
@@ -244,6 +293,7 @@ def login():
             _fail.pop(ip, None)
             session.permanent = False
             session["ok"] = True
+            get_csrf_token()
             return redirect(url_for("index"))
         # 실패 기록
         _fail[ip] = (cnt + 1, now)
@@ -270,7 +320,7 @@ def index():
     r = need_auth()
     if r:
         return r
-    return render_template("index.html")
+    return render_template("index.html", csrf_token=get_csrf_token())
 
 
 # ════════════════════════════════════════
@@ -303,24 +353,42 @@ def diary_save():
     if not session.get("ok"):
         return error_response("unauthorized", 401)
 
+    csrf_failure = require_csrf()
+    if csrf_failure:
+        return csrf_failure
+
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return error_response("invalid_payload")
+        return error_response("invalid_payload", 400, code="invalid_payload")
 
     date_raw = data.get("date")
     date = normalize_input_date(date_raw)
     if not date:
-        return error_response("invalid_date")
+        return error_response("invalid date", 400, code="invalid_date")
 
-    payload = {
-        "f1": data.get("f1", "") if isinstance(data, dict) else "",
-        "f2": data.get("f2", "") if isinstance(data, dict) else "",
-        "f3": data.get("f3", "") if isinstance(data, dict) else "",
-        "f4": data.get("f4", "") if isinstance(data, dict) else "",
-        "entry_type": data.get("entry_type", "manual") if isinstance(data, dict) else "manual",
-        "confidence": data.get("confidence", 1.0) if isinstance(data, dict) else 1.0,
-        "source_note": data.get("source_note", "") if isinstance(data, dict) else "",
-    }
+    f1, err = validate_text_field(data.get("f1"), "f1")
+    if err:
+        return err
+    f2, err = validate_text_field(data.get("f2"), "f2")
+    if err:
+        return err
+    f3, err = validate_text_field(data.get("f3"), "f3")
+    if err:
+        return err
+    f4, err = validate_text_field(data.get("f4"), "f4")
+    if err:
+        return err
+    source_note, err = validate_text_field(data.get("source_note"), "source_note")
+    if err:
+        return err
+
+    entry_type, err = validate_entry_type(data.get("entry_type"))
+    if err:
+        return err
+
+    confidence, err = validate_confidence(data.get("confidence"))
+    if err:
+        return err
 
     with get_db_connection() as c:
         c.execute(
@@ -337,13 +405,13 @@ def diary_save():
             """,
             (
                 date,
-                payload["f1"],
-                payload["f2"],
-                payload["f3"],
-                payload["f4"],
-                payload["entry_type"],
-                payload["confidence"],
-                payload["source_note"],
+                f1,
+                f2,
+                f3,
+                f4,
+                entry_type,
+                confidence,
+                source_note,
             ),
         )
     return jsonify({"ok": True})
@@ -354,8 +422,16 @@ def diary_delete(date):
     if not session.get("ok"):
         return error_response("unauthorized", 401)
 
+    csrf_failure = require_csrf()
+    if csrf_failure:
+        return csrf_failure
+
+    normalized_date = normalize_input_date(date)
+    if not normalized_date:
+        return error_response("invalid date", 400, code="invalid_date")
+
     with get_db_connection() as c:
-        c.execute("DELETE FROM diary WHERE date=?", (date,))
+        c.execute("DELETE FROM diary WHERE date=?", (normalized_date,))
     return jsonify({"ok": True})
 
 

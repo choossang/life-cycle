@@ -44,6 +44,11 @@ class DiarySchemaMigrationTests(unittest.TestCase):
     def _login(self):
         return self.client.post("/login", data={"pw": "test-password"}, follow_redirects=True)
 
+    def _csrf_header(self):
+        with self.client.session_transaction() as sess:
+            token = sess.get("csrf_token")
+        return {"X-CSRF-Token": token} if token else {}
+
     def _setup_legacy_db(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DROP TABLE IF EXISTS diary")
@@ -132,6 +137,7 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         response = self.client.post(
             "/api/diary",
             json={"date": "1979년 02월", "f1": "text"},
+            headers=self._csrf_header(),
         )
 
         body = response.get_json() or {}
@@ -145,6 +151,7 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         response = self.client.post(
             "/api/diary",
             json={"date": 202601, "f1": "text"},
+            headers=self._csrf_header(),
         )
 
         body = response.get_json() or {}
@@ -195,3 +202,77 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertEqual(row["f2"], "legacy2")
         self.assertEqual(row["f3"], "normalized3")
         self.assertEqual(row["f4"], "legacy4")
+
+    def test_diary_post_requires_csrf(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={"date": "2026-01", "f1": "text"},
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(body.get("code"), "csrf_failed")
+        self.assertIn("error", body)
+
+    def test_diary_post_persists_metadata_fields(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={
+                "date": "2026-01",
+                "f1": "a",
+                "f2": "b",
+                "f3": "c",
+                "f4": "d",
+                "entry_type": "retro",
+                "confidence": 0.4,
+                "source_note": "imported from notes",
+            },
+            headers=self._csrf_header(),
+        )
+        self.assertEqual(response.status_code, 200)
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT entry_type, confidence, source_note FROM diary WHERE date = ?",
+                ("2026-01",),
+            ).fetchone()
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row["entry_type"], "retro")
+        self.assertAlmostEqual(row["confidence"], 0.4)
+        self.assertEqual(row["source_note"], "imported from notes")
+
+    def test_diary_delete_requires_csrf(self):
+        self._login()
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO diary (date, f1, f2, f3, f4, entry_type, confidence, source_note, created_at, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'), datetime('now','localtime'))",
+                ("2026-01", "a", "b", "c", "d", "manual", 1.0, ""),
+            )
+
+        response = self.client.delete("/api/diary/2026-01")
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(body.get("code"), "csrf_failed")
+        self.assertIn("error", body)
+
+    def test_diary_post_rejects_invalid_entry_type(self):
+        self._login()
+
+        response = self.client.post(
+            "/api/diary",
+            json={"date": "2026-01", "f1": "text", "entry_type": "invalid"},
+            headers=self._csrf_header(),
+        )
+
+        body = response.get_json() or {}
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(body.get("code"), "invalid_entry_type")
+        self.assertIn("error", body)
