@@ -271,6 +271,84 @@ def init_db():
     normalize_existing_diary_dates()
 
 
+def score_band_summary(score):
+    try:
+        numeric = float(score)
+    except (TypeError, ValueError):
+        return "해석 정보 없음"
+
+    if numeric >= 70:
+        return "강점 구간"
+    if numeric >= 40:
+        return "균형 구간"
+    return "보완 구간"
+
+
+def confidence_phrase(confidence):
+    try:
+        numeric = float(confidence)
+    except (TypeError, ValueError):
+        return "기본 신뢰"
+
+    if numeric >= 0.8:
+        return "높은 신뢰"
+    if numeric >= 0.5:
+        return "중간 신뢰"
+    return "낮은 신뢰"
+
+
+def build_label_interpretation(label, score, evidence, confidence):
+    label_names = {
+        "job": "일/역할",
+        "gui": "관계",
+        "hlt": "건강",
+    }
+    label_name = label_names.get(label, label)
+    summary = score_band_summary(score)
+    trust = confidence_phrase(confidence)
+    evidence_text = evidence.strip() if isinstance(evidence, str) and evidence.strip() else "기록 없음"
+    return f"{label_name}: {summary} ({trust}). 근거: {evidence_text}"
+
+
+def load_saju_data_index():
+    json_path = os.path.join(os.path.dirname(__file__), "saju_data.json")
+    if not os.path.exists(json_path):
+        return {}
+
+    with open(json_path, encoding="utf-8") as f:
+        rows = json.load(f)
+
+    index = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        key = normalize_input_date(row.get("date"), allow_korean=True)
+        if not key:
+            continue
+        index[key] = row
+    return index
+
+
+def build_interpretation(diary_row, saju_row):
+    evidence_map = {
+        "job": diary_row.get("f1", ""),
+        "gui": diary_row.get("f2", ""),
+        "hlt": diary_row.get("f3", ""),
+    }
+    confidence = diary_row.get("confidence", 1.0)
+
+    if not isinstance(saju_row, dict):
+        return {
+            label: build_label_interpretation(label, None, evidence, confidence)
+            for label, evidence in evidence_map.items()
+        }
+
+    return {
+        label: build_label_interpretation(label, saju_row.get(label), evidence, confidence)
+        for label, evidence in evidence_map.items()
+    }
+
+
 init_db()
 
 
@@ -346,7 +424,16 @@ def diary_get():
     with get_db_connection() as c:
         c.row_factory = sqlite3.Row
         rows = c.execute("SELECT * FROM diary ORDER BY date").fetchall()
-    return jsonify([dict(r) for r in rows])
+
+    saju_index = load_saju_data_index()
+    payload = []
+    for row in rows:
+        item = dict(row)
+        saju_row = saju_index.get(item.get("date"))
+        item["interpretation"] = build_interpretation(item, saju_row)
+        payload.append(item)
+
+    return jsonify(payload)
 
 
 @app.route("/api/diary", methods=["POST"])

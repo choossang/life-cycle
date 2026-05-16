@@ -21,6 +21,26 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         os.close(fd)
         os.remove(self.db_path)
         os.environ["DB_PATH"] = self.db_path
+
+        self.saju_data_path = APP_DIR / "saju_data.json"
+        self._saju_data_backup = None
+        if self.saju_data_path.exists():
+            self._saju_data_backup = self.saju_data_path.read_text(encoding="utf-8")
+        self.saju_data_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "date": "1979년 02월",
+                        "job": 72,
+                        "gui": 64,
+                        "hlt": 58,
+                    }
+                ],
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
         self._load_app()
 
     def tearDown(self):
@@ -28,6 +48,12 @@ class DiarySchemaMigrationTests(unittest.TestCase):
             if module_name == "app" or module_name.endswith(".app"):
                 if module_name in sys.modules:
                     del sys.modules[module_name]
+
+        if self._saju_data_backup is None:
+            if self.saju_data_path.exists():
+                self.saju_data_path.unlink()
+        else:
+            self.saju_data_path.write_text(self._saju_data_backup, encoding="utf-8")
 
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
@@ -368,3 +394,45 @@ class DiarySchemaMigrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(body.get("code"), "invalid_entry_type")
         self.assertIn("error", body)
+
+    def test_diary_get_includes_interpretation_with_evidence_text(self):
+        self._login()
+
+        save_response = self.client.post(
+            "/api/diary",
+            json={
+                "date": "1979-02",
+                "f1": "새로운 역할 제안을 받았다",
+                "f2": "협업이 안정적이었다",
+                "f3": "체력 관리를 시작했다",
+                "f4": "감정 기복이 줄었다",
+            },
+            headers=self._csrf_header(),
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        response = self.client.get("/api/diary")
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.get_json() or []
+        self.assertEqual(len(rows), 1)
+
+        interpretation = rows[0].get("interpretation")
+        self.assertIsInstance(interpretation, dict)
+        self.assertIn("job", interpretation)
+        self.assertIn("gui", interpretation)
+        self.assertIn("hlt", interpretation)
+        self.assertIn("새로운 역할 제안을 받았다", interpretation["job"])
+
+    def test_saju_api_remains_raw_scores_without_interpretation(self):
+        self._login()
+
+        response = self.client.get("/api/saju")
+        self.assertEqual(response.status_code, 200)
+
+        rows = response.get_json() or []
+        self.assertGreater(len(rows), 0)
+        self.assertIn("job", rows[0])
+        self.assertIn("gui", rows[0])
+        self.assertIn("hlt", rows[0])
+        self.assertNotIn("interpretation", rows[0])
